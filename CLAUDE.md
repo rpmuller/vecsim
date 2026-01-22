@@ -30,9 +30,14 @@ The simulator uses state vector representation where quantum states are stored a
 
 ### Running Tests
 ```bash
+make test
+```
+The module uses doctest for testing. Doctests are embedded in function docstrings throughout vecsim.py. The test command runs pytest with `--doctest-modules` flag.
+
+Alternatively, run doctests directly:
+```bash
 python vecsim.py
 ```
-The module uses doctest for testing. Doctests are embedded in function docstrings throughout vecsim.py.
 
 ### Running JupyterLab
 ```bash
