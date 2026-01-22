@@ -59,6 +59,6 @@ python vecsim.py
 
 ## Requirements
 
-- Python 3.13+
+- Python 3.8+
 - NumPy
 - pytest (dev dependency)

@@ -54,7 +54,7 @@ python main.py
 
 - **numpy**: Core numerical operations and linear algebra
 - **jupyterlab**: For interactive development and experimentation
-- Uses Python 3.13+ (specified in pyproject.toml)
+- Uses Python 3.8+ (specified in pyproject.toml)
 - Managed via uv package manager (uv.lock present)
 
 ## Key Implementation Details
