@@ -180,4 +180,4 @@ def ket(vecstring="0"):
 def qterm(i,qi,n): return f"{qcoef(qi)}|{i:0{n}b}>"
 def qcoef(a): return a.real if np.isreal(a) else a
 
-if __name__ == '__main__': doctest.testmod()
+if __name__ == '__main__': doctest.testmod(verbose=True)
