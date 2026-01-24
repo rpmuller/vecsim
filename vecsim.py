@@ -299,6 +299,66 @@ class QReg:
     def CNOT(self, control: int, target: int) -> 'QReg':
         """Apply controlled-NOT gate with control and target qubits."""
         return self.apply2q(CNOT, control, target)
+    
+    def M(self, i: int, ntimes: int = 1) -> list:
+        """
+        Measure qubit `i` `ntimes` times, collapsing the state each time.
+
+        Each measurement:
+        1. Calculates probability of |0⟩ vs |1⟩ for qubit i
+        2. Randomly selects outcome based on probabilities
+        3. Collapses state vector to the measured outcome
+        4. Renormalizes the state
+
+        Args:
+            i: Zero-indexed qubit position to measure
+            ntimes: Number of measurements to perform
+
+        Returns:
+            List of measurement outcomes (0 or 1)
+
+        Raises:
+            ValueError: If qubit index is out of range
+
+        Examples:
+            >>> ket('0').M(0)
+            [0]
+            >>> ket('1').M(0)
+            [1]
+            >>> import numpy as np; np.random.seed(42)
+            >>> ket('+').M(0)  # Random outcome, then state collapses
+            [0]
+            >>> # After collapse, repeated measurements give same result
+            >>> s = ket('+'); np.random.seed(42)
+            >>> r1 = s.M(0)  # First measurement collapses state
+            >>> s.M(0, 3)    # Subsequent measurements are deterministic
+            [0, 0, 0]
+        """
+        if not (0 <= i < self.n):
+            raise ValueError(f"Invalid qubit {i}. Must be in [0, {self.n})")
+
+        results = []
+        for _ in range(ntimes):
+            # Calculate probability of measuring |0⟩ on qubit i
+            # Sum |amplitude|^2 for all basis states where qubit i is 0
+            prob0 = 0.0
+            for idx, amp in enumerate(self.v):
+                if (idx >> i) & 1 == 0:  # Qubit i is 0 in this basis state
+                    prob0 += abs(amp) ** 2
+
+            # Randomly choose outcome based on probability
+            outcome = 0 if np.random.random() < prob0 else 1
+            results.append(outcome)
+
+            # Collapse the state: zero out amplitudes inconsistent with outcome
+            for idx in range(len(self.v)):
+                if (idx >> i) & 1 != outcome:
+                    self.v[idx] = 0
+
+            # Renormalize
+            self.normalize()
+
+        return results
 
 # quantum states
 q0 = QReg([1,0])

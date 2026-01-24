@@ -358,6 +358,135 @@ class StabilizerState:
         # Actually for stabilizer states, applying Y flips both X and Z phases
         return self.X(target).Z(target)
 
+    def M(self, i: int, ntimes: int = 1) -> list:
+        """
+        Measure qubit `i` `ntimes` times, collapsing the state each time.
+
+        For stabilizer states, measurement uses the Aaronson-Gottesman algorithm:
+        1. Check if any stabilizer anticommutes with Z_i (has X_i = 1)
+        2. If yes: outcome is random, update tableau accordingly
+        3. If no: outcome is deterministic, computed from destabilizers
+
+        Args:
+            i: Zero-indexed qubit position to measure
+            ntimes: Number of measurements to perform
+
+        Returns:
+            List of measurement outcomes (0 or 1)
+
+        Raises:
+            ValueError: If qubit index is out of range
+
+        Examples:
+            >>> ket('0').M(0)
+            [0]
+            >>> ket('1').M(0)
+            [1]
+            >>> import numpy as np; np.random.seed(42)
+            >>> ket('+').M(0)
+            [0]
+            >>> # After collapse, repeated measurements give same result
+            >>> s = ket('+'); np.random.seed(42)
+            >>> r1 = s.M(0)
+            >>> s.M(0, 3)
+            [0, 0, 0]
+        """
+        if not (0 <= i < self.n):
+            raise ValueError(f"Invalid qubit {i}. Must be in [0, {self.n})")
+
+        results = []
+        for _ in range(ntimes):
+            outcome = self._measure_single(i)
+            results.append(outcome)
+
+        return results
+
+    def _measure_single(self, i: int) -> int:
+        """
+        Perform a single measurement of qubit i, updating the tableau.
+
+        Returns:
+            Measurement outcome (0 or 1)
+        """
+        import numpy as np
+
+        # Find if any stabilizer anticommutes with Z_i
+        # A Pauli string anticommutes with Z_i if it has X_i = 1
+        p = None  # Index of first anticommuting stabilizer
+        for row in range(self.n, 2 * self.n):
+            if self.x[row, i] == 1:
+                p = row
+                break
+
+        if p is not None:
+            # Random outcome case: some stabilizer anticommutes with Z_i
+            return self._measure_random(i, p)
+        else:
+            # Deterministic outcome case: all stabilizers commute with Z_i
+            return self._measure_deterministic(i)
+
+    def _measure_random(self, i: int, p: int) -> int:
+        """
+        Handle measurement when outcome is random.
+
+        Args:
+            i: Qubit being measured
+            p: Index of first stabilizer that anticommutes with Z_i
+        """
+        import numpy as np
+
+        # For all other rows that anticommute with Z_i, multiply by row p
+        # This makes them commute with Z_i
+        for row in range(2 * self.n):
+            if row != p and self.x[row, i] == 1:
+                self._rowmult(row, p)
+
+        # Copy stabilizer p to its corresponding destabilizer slot
+        dest_row = p - self.n
+        self.x[dest_row] = self.x[p].copy()
+        self.z[dest_row] = self.z[p].copy()
+        self.r[dest_row] = self.r[p]
+
+        # Set stabilizer p to ±Z_i based on random outcome
+        outcome = np.random.randint(0, 2)
+
+        # Clear row p and set it to Z_i
+        self.x[p] = 0
+        self.z[p] = 0
+        self.z[p, i] = 1
+        # Phase: 0 for +Z_i (outcome 0), 2 for -Z_i (outcome 1)
+        self.r[p] = 2 * outcome
+
+        return outcome
+
+    def _measure_deterministic(self, i: int) -> int:
+        """
+        Handle measurement when outcome is deterministic.
+
+        The outcome is determined by the existing stabilizer generators.
+        We use the destabilizers to compute it.
+        """
+        # Find destabilizers that anticommute with Z_i (have X_i = 1)
+        # Multiply them together to get the effective stabilizer
+        phase = 0
+
+        # We need to find which combination of stabilizers gives us Z_i
+        # Look at destabilizers: if destabilizer j has X_i = 1, then
+        # stabilizer j contributes to the measurement outcome
+        for j in range(self.n):
+            if self.x[j, i] == 1:  # Destabilizer j anticommutes with Z_i
+                # The corresponding stabilizer j+n contributes
+                # Multiply into our accumulated result
+                # We only need to track the phase contribution
+                phase = (phase + self.r[self.n + j]) % 4
+
+        # The phase tells us the outcome:
+        # phase 0 -> +1 eigenvalue -> outcome 0
+        # phase 2 -> -1 eigenvalue -> outcome 1
+        outcome = 1 if phase == 2 else 0
+
+        return outcome
+
 
 def ket(vecstring: str = "0") -> StabilizerState:
     """
